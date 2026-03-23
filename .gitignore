@@ -1,0 +1,25 @@
+# Frontend (Node, Expo, React Native)
+checkpoint-mobile/node_modules/
+checkpoint-mobile/.expo/
+checkpoint-mobile/dist/
+checkpoint-mobile/web-build/
+**/node_modules/
+
+# Backend (C# / .NET)
+**/bin/
+**/obj/
+.vs/
+*.user
+*.userosscache
+*.suo
+*.sln.docstates
+
+# Config & Environment
+appsettings.Development.json
+.env
+.env.local
+.env.*.local
+
+# OS Files
+.DS_Store
+Thumbs.db
