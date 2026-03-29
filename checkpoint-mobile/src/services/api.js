@@ -1,7 +1,9 @@
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Backend API base URL
 // Geliştirme sırasında localhost, production'da sunucu adresi kullanılacak
+// ÖNEMLİ: Emulator/cihaz üzerinde çalıştırırken localhost yerine bilgisayarınızın local IP'sini girmelisiniz (örn: http://192.168.1.5:5000/api)
 const API_BASE_URL = 'http://localhost:5000/api';
 
 const api = axios.create({
@@ -11,6 +13,20 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// Request Interceptor: Her istekte AsyncStorage'dan token'ı alıp Header'a ekler
+api.interceptors.request.use(
+  async (config) => {
+    const token = await AsyncStorage.getItem('userToken');
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
 
 // ==================== AUTH ====================
 export const authService = {

@@ -1,59 +1,67 @@
+using CheckpointAPI.Business.Abstract;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CheckpointAPI.Controllers
 {
-    /// <summary>
-    /// Kimlik doğrulama controller'ı
-    /// Kullanıcı kayıt ve giriş işlemleri
-    /// </summary>
     [ApiController]
     [Route("api/[controller]")]
     public class AuthController : ControllerBase
     {
-        // TODO: IAuthService enjekte edilecek
+        private readonly IAuthService _authService;
 
-        /// <summary>
-        /// Yeni kullanıcı kaydı
-        /// </summary>
+        public AuthController(IAuthService authService)
+        {
+            _authService = authService;
+        }
+
         [HttpPost("register")]
-        public IActionResult Register([FromBody] RegisterRequest request)
+        public async Task<IActionResult> Register([FromBody] RegisterDto request)
         {
-            // TODO: Kullanıcı kayıt iş mantığı
-            return Ok(new { message = "Kullanıcı başarıyla kaydedildi", userId = 1 });
+            var result = await _authService.RegisterAsync(request);
+            if (!result.Success)
+            {
+                return BadRequest(new { message = result.Message });
+            }
+
+            return Ok(new
+            {
+                message = result.Message,
+                token = result.Token,
+                user = new { result.User!.Id, result.User.Username, result.User.Email, result.User.Level }
+            });
         }
 
-        /// <summary>
-        /// Kullanıcı girişi
-        /// </summary>
         [HttpPost("login")]
-        public IActionResult Login([FromBody] LoginRequest request)
+        public async Task<IActionResult> Login([FromBody] LoginDto request)
         {
-            // TODO: JWT token üretimi
-            return Ok(new { token = "jwt-token-placeholder", userId = 1 });
+            var result = await _authService.LoginAsync(request);
+            if (!result.Success)
+            {
+                return Unauthorized(new { message = result.Message });
+            }
+
+            return Ok(new
+            {
+                message = result.Message,
+                token = result.Token,
+                user = new { result.User!.Id, result.User.Username, result.User.Email, result.User.Level }
+            });
         }
 
-        /// <summary>
-        /// Mevcut kullanıcı profili
-        /// </summary>
         [HttpGet("profile")]
+        [Authorize]
         public IActionResult GetProfile()
         {
-            // TODO: Token'dan kullanıcı bilgisi alınacak
-            return Ok(new { message = "Profil bilgileri" });
+            var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var email = User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
+            var username = User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
+
+            return Ok(new
+            {
+                message = "Profil bilgileri",
+                user = new { id = userId, email, username }
+            });
         }
-    }
-
-    // Request modelleri
-    public class RegisterRequest
-    {
-        public string Username { get; set; } = string.Empty;
-        public string Email { get; set; } = string.Empty;
-        public string Password { get; set; } = string.Empty;
-    }
-
-    public class LoginRequest
-    {
-        public string Email { get; set; } = string.Empty;
-        public string Password { get; set; } = string.Empty;
     }
 }
