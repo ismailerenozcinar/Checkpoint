@@ -3,6 +3,7 @@ import { StatusBar, ActivityIndicator, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import AppNavigator from './src/navigation/AppNavigator';
 import LoginScreen from './src/screens/LoginScreen';
@@ -55,7 +56,7 @@ export default function App() {
   }
 
   return (
-    <>
+    <SafeAreaProvider style={{ flex: 1 }}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
       <NavigationContainer>
         <Stack.Navigator screenOptions={{ headerShown: false, animation: 'fade' }}>
@@ -83,6 +84,6 @@ export default function App() {
           )}
         </Stack.Navigator>
       </NavigationContainer>
-    </>
+    </SafeAreaProvider>
   );
 }

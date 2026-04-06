@@ -1,5 +1,6 @@
 using CheckpointAPI.Entities;
 using CheckpointAPI.DataAccess.Context;
+using CheckpointAPI.DataAccess.Abstract;
 using Microsoft.EntityFrameworkCore;
 
 namespace CheckpointAPI.DataAccess.Concrete
