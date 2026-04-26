@@ -4,6 +4,7 @@ using CheckpointAPI.DataAccess.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CheckpointAPI.DataAccess.Migrations
 {
     [DbContext(typeof(CheckpointDbContext))]
-    partial class CheckpointDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260425143431_Week3_GameSeedData")]
+    partial class Week3_GameSeedData
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

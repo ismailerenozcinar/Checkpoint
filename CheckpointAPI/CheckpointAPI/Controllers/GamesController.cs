@@ -1,59 +1,104 @@
 using Microsoft.AspNetCore.Mvc;
+using CheckpointAPI.Business.Abstract;
 
 namespace CheckpointAPI.Controllers
 {
-    /// <summary>
-    /// Oyun yönetimi controller'ı
-    /// Oyun CRUD işlemleri, arama ve trend oyunlar
-    /// </summary>
     [ApiController]
     [Route("api/[controller]")]
     public class GamesController : ControllerBase
     {
+        private readonly IGameService _gameService;
+
+        public GamesController(IGameService gameService)
+        {
+            _gameService = gameService;
+        }
+
         /// <summary>
-        /// Trend oyunları getir
+        /// Trend oyunları getir (rating ve yorum sayısına göre)
         /// </summary>
         [HttpGet("trending")]
-        public IActionResult GetTrending()
+        public async Task<IActionResult> GetTrending()
         {
-            // TODO: En popüler oyunları getir
-            var games = new[]
+            var games = await _gameService.GetTrendingGamesAsync();
+            var result = games.Select(g => new
             {
-                new { Id = 1, Title = "Elden Ring", Developer = "FromSoftware", Rating = 4.9 },
-                new { Id = 2, Title = "Cyberpunk 2077", Developer = "CD Projekt Red", Rating = 4.8 },
-                new { Id = 3, Title = "Starfield", Developer = "Bethesda", Rating = 4.2 }
-            };
-            return Ok(games);
+                g.Id,
+                g.Title,
+                g.Developer,
+                g.Publisher,
+                g.ReleaseYear,
+                g.Description,
+                g.CoverImageUrl,
+                g.Rating,
+                g.ReviewCount,
+                Genres = g.GameGenres.Select(gg => gg.Genre.Name).ToList()
+            });
+            return Ok(result);
         }
 
         /// <summary>
         /// ID ile oyun detayını getir
         /// </summary>
         [HttpGet("{id}")]
-        public IActionResult GetById(int id)
+        public async Task<IActionResult> GetById(int id)
         {
-            // TODO: Veritabanından oyun detayı
-            return Ok(new { Id = id, Title = "Oyun Detayı", Message = "Detay bilgileri burada" });
+            var game = await _gameService.GetGameByIdAsync(id);
+            if (game == null)
+                return NotFound(new { Message = "Oyun bulunamadı." });
+
+            return Ok(new
+            {
+                game.Id,
+                game.Title,
+                game.Developer,
+                game.Publisher,
+                game.ReleaseYear,
+                game.Description,
+                game.CoverImageUrl,
+                game.Rating,
+                game.ReviewCount,
+                Genres = game.GameGenres.Select(gg => gg.Genre.Name).ToList()
+            });
         }
 
         /// <summary>
-        /// Oyun arama
+        /// Oyun arama ve genre filtreleme
         /// </summary>
         [HttpGet("search")]
-        public IActionResult Search([FromQuery] string? query, [FromQuery] string? genre)
+        public async Task<IActionResult> Search([FromQuery] string? query, [FromQuery] string? genre)
         {
-            // TODO: Arama ve filtreleme
-            return Ok(new { Results = new object[] { }, TotalCount = 0, Query = query });
+            var games = await _gameService.SearchGamesAsync(query ?? string.Empty, genre);
+            var result = games.Select(g => new
+            {
+                g.Id,
+                g.Title,
+                g.Developer,
+                g.CoverImageUrl,
+                g.Rating,
+                g.ReviewCount,
+                Genres = g.GameGenres.Select(gg => gg.Genre.Name).ToList()
+            });
+            return Ok(new { Results = result, TotalCount = games.Count, Query = query });
         }
 
         /// <summary>
-        /// Benzer oyunları getir
+        /// Aynı türdeki benzer oyunları getir
         /// </summary>
         [HttpGet("{id}/similar")]
-        public IActionResult GetSimilar(int id)
+        public async Task<IActionResult> GetSimilar(int id)
         {
-            // TODO: Tür bazlı benzer oyunlar
-            return Ok(new object[] { });
+            var games = await _gameService.GetSimilarGamesAsync(id);
+            var result = games.Select(g => new
+            {
+                g.Id,
+                g.Title,
+                g.Developer,
+                g.CoverImageUrl,
+                g.Rating,
+                Genres = g.GameGenres.Select(gg => gg.Genre.Name).ToList()
+            });
+            return Ok(result);
         }
     }
 }

@@ -56,6 +56,8 @@ builder.Services.AddDbContext<CheckpointDbContext>(options =>
 // Dependency Injection (DI)
 builder.Services.AddScoped<IUserDal, EfUserDal>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IGameDal, EfGameDal>();
+builder.Services.AddScoped<IGameService, GameService>();
 
 // CORS
 builder.Services.AddCors(options =>

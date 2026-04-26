@@ -3,22 +3,26 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import HomeScreen from '../screens/HomeScreen';
 import GameDetailScreen from '../screens/GameDetailScreen';
 import ReviewScreen from '../screens/ReviewScreen';
+import SearchScreen from '../screens/SearchScreen';
 
-const Stack = createNativeStackNavigator();
+const HomeStack = createNativeStackNavigator();
+const SearchStack = createNativeStackNavigator();
 
-// Home sekmesinin stack navigasyonu
-// Home -> GameDetail -> Review şeklinde ilerler
-export default function HomeStack() {
+export function HomeStackNavigator() {
   return (
-    <Stack.Navigator
-      screenOptions={{
-        headerShown: false,
-        animation: 'slide_from_right',
-      }}
-    >
-      <Stack.Screen name="HomeScreen" component={HomeScreen} />
-      <Stack.Screen name="GameDetail" component={GameDetailScreen} />
-      <Stack.Screen name="Review" component={ReviewScreen} />
-    </Stack.Navigator>
+    <HomeStack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+      <HomeStack.Screen name="HomeScreen" component={HomeScreen} />
+      <HomeStack.Screen name="GameDetail" component={GameDetailScreen} />
+      <HomeStack.Screen name="Review" component={ReviewScreen} />
+    </HomeStack.Navigator>
+  );
+}
+
+export function SearchStackNavigator() {
+  return (
+    <SearchStack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+      <SearchStack.Screen name="SearchScreen" component={SearchScreen} />
+      <SearchStack.Screen name="GameDetail" component={GameDetailScreen} />
+    </SearchStack.Navigator>
   );
 }

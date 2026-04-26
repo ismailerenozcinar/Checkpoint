@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,171 +6,253 @@ import {
   ScrollView,
   Image,
   TouchableOpacity,
+  ActivityIndicator,
+  Animated,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS } from '../constants/theme';
+import { gameService, reviewService } from '../services/api';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const COVER_HEIGHT = 280;
+
+function StarRow({ rating, size = 14 }) {
+  return (
+    <View style={{ flexDirection: 'row', gap: 2 }}>
+      {[1, 2, 3, 4, 5].map((s) => (
+        <Ionicons
+          key={s}
+          name={s <= Math.round(rating) ? 'star' : 'star-outline'}
+          size={size}
+          color={COLORS.star}
+        />
+      ))}
+    </View>
+  );
+}
 
 export default function GameDetailScreen({ route, navigation }) {
-  // Oyun bilgisi navigasyonla gelecek
-  const game = route?.params?.game || {
-    id: 1,
-    title: 'Cyberpunk 2077',
-    genre: 'ACTION',
-    developer: 'CD PROJEKT RED',
-    rating: 4.8,
-    image: 'https://picsum.photos/seed/cyberpunk/400/250',
-  };
+  const gameId = route.params?.gameId ?? route.params?.game?.id;
 
-  const genres = ['RPG', 'ACTION', 'OPEN WORLD'];
+  const [game, setGame] = useState(null);
+  const [similar, setSimilar] = useState([]);
+  const [reviews, setReviews] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [descExpanded, setDescExpanded] = useState(false);
 
-  const reviews = [
-    {
-      id: 1,
-      user: 'Johnny_Silverhand',
-      rating: 5,
-      text: '"The Phantom Liberty expansion completely changed the game. It\'s a masterpiece now. Night City has never looked better."',
-      date: '2 days ago',
-    },
-    {
-      id: 2,
-      user: 'NightCityRunner',
-      rating: 4,
-      text: '"Solid RPG elements and the storytelling is top tier. A few bugs still linger but nothing game breaking."',
-      date: '1 week ago',
-    },
-  ];
+  const scrollY = useRef(new Animated.Value(0)).current;
 
-  const similarGames = [
-    { id: 1, title: 'The Witcher 3', genre: 'RPG, Fantasy', image: 'https://picsum.photos/seed/witcher/120/120' },
-    { id: 2, title: 'Starfield', genre: 'RPG, Sci-Fi', image: 'https://picsum.photos/seed/starfield2/120/120' },
-    { id: 3, title: 'Deus Ex', genre: 'RPG, Cyberpunk', image: 'https://picsum.photos/seed/deusex/120/120' },
-  ];
+  // Animasyonlar
+  const headerOpacity = scrollY.interpolate({
+    inputRange: [COVER_HEIGHT - 80, COVER_HEIGHT - 40],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+  const coverTranslate = scrollY.interpolate({
+    inputRange: [0, COVER_HEIGHT],
+    outputRange: [0, -COVER_HEIGHT / 2],
+    extrapolate: 'clamp',
+  });
+  const coverScale = scrollY.interpolate({
+    inputRange: [-80, 0],
+    outputRange: [1.2, 1],
+    extrapolate: 'clamp',
+  });
+
+  const fetchAll = useCallback(async () => {
+    if (!gameId) { setLoading(false); return; }
+    try {
+      const [gameRes, similarRes, reviewRes] = await Promise.allSettled([
+        gameService.getById(gameId),
+        gameService.getSimilar(gameId),
+        reviewService.getByGame(gameId),
+      ]);
+      if (gameRes.status === 'fulfilled')    setGame(gameRes.value.data);
+      if (similarRes.status === 'fulfilled') setSimilar(similarRes.value.data);
+      if (reviewRes.status === 'fulfilled')  setReviews(reviewRes.value.data ?? []);
+    } catch (_) {}
+    finally { setLoading(false); }
+  }, [gameId]);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  if (loading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
+
+  if (!game) {
+    return (
+      <View style={styles.centered}>
+        <Ionicons name="alert-circle-outline" size={48} color={COLORS.textSecondary} />
+        <Text style={styles.emptyText}>Oyun bulunamadı.</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backFallback}>
+          <Text style={{ color: COLORS.primary }}>Geri Dön</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const description = game.description ?? '';
+  const shortDesc = description.length > 160 ? description.slice(0, 160) + '…' : description;
 
   return (
     <View style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Cover Image */}
+      {/* Animated sticky header */}
+      <Animated.View style={[styles.stickyHeader, { opacity: headerOpacity }]}>
+        <TouchableOpacity style={styles.stickyBack} onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={22} color={COLORS.textPrimary} />
+        </TouchableOpacity>
+        <Text style={styles.stickyTitle} numberOfLines={1}>{game.title}</Text>
+      </Animated.View>
+
+      <Animated.ScrollView
+        showsVerticalScrollIndicator={false}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true }
+        )}
+        scrollEventThrottle={16}
+      >
+        {/* Cover Image with parallax */}
         <View style={styles.coverContainer}>
-          <Image source={{ uri: game.image }} style={styles.coverImage} />
+          <Animated.Image
+            source={{ uri: game.coverImageUrl }}
+            style={[
+              styles.coverImage,
+              { transform: [{ translateY: coverTranslate }, { scale: coverScale }] },
+            ]}
+            resizeMode="cover"
+          />
+          {/* Gradient overlay */}
+          <View style={styles.coverGradient} />
           <View style={styles.coverOverlay}>
             <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-              <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
+              <Ionicons name="arrow-back" size={22} color="#fff" />
             </TouchableOpacity>
-            <View style={styles.coverActions}>
-              <TouchableOpacity>
-                <Ionicons name="share-social-outline" size={22} color={COLORS.textPrimary} />
-              </TouchableOpacity>
-              <TouchableOpacity>
-                <Ionicons name="ellipsis-vertical" size={22} color={COLORS.textPrimary} />
-              </TouchableOpacity>
-            </View>
           </View>
         </View>
 
-        {/* Tür Etiketleri */}
-        <View style={styles.tagsRow}>
-          {genres.map((g, i) => (
-            <View key={i} style={styles.tag}>
-              <Text style={styles.tagText}>{g}</Text>
-            </View>
-          ))}
-        </View>
-
-        {/* Oyun Başlığı */}
-        <Text style={styles.title}>{game.title}</Text>
-        <Text style={styles.developer}>{game.developer} • 2020</Text>
-
-        {/* Aksiyon Butonları */}
-        <TouchableOpacity style={styles.primaryButton}>
-          <Ionicons name="library-outline" size={18} color={COLORS.background} />
-          <Text style={styles.primaryButtonText}>Add to Library</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.secondaryButton}>
-          <Ionicons name="play-circle-outline" size={18} color={COLORS.primary} />
-          <Text style={styles.secondaryButtonText}>Mark as Playing</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.outlineButton}>
-          <Ionicons name="bookmark-outline" size={18} color={COLORS.textPrimary} />
-          <Text style={styles.outlineButtonText}>Add to Wishlist</Text>
-        </TouchableOpacity>
-
-        {/* Rating */}
-        <View style={styles.ratingSection}>
-          <Text style={styles.ratingBig}>{game.rating}</Text>
-          <View style={styles.starsRow}>
-            {[1, 2, 3, 4, 5].map((s) => (
-              <Ionicons
-                key={s}
-                name={s <= Math.round(game.rating) ? 'star' : 'star-outline'}
-                size={16}
-                color={COLORS.star}
-              />
+        <View style={styles.body}>
+          {/* Genre tags */}
+          <View style={styles.tagsRow}>
+            {(game.genres ?? []).map((g) => (
+              <View key={g} style={styles.tag}>
+                <Text style={styles.tagText}>{g.toUpperCase()}</Text>
+              </View>
             ))}
           </View>
-          <Text style={styles.reviewCount}>24.5K REVIEWS</Text>
-        </View>
 
-        {/* Açıklama */}
-        <Text style={styles.sectionTitle}>Description</Text>
-        <Text style={styles.description}>
-          {game.title} is an open-world, action-adventure RPG set in the megalopolis of Night City,
-          where you play as a cyberpunk mercenary wrapped up in a do-or-die fight for survival.
-          Improved and featuring all-new free additional content, customize your character and
-          playstyle as you take on jobs, build a reputation, and unlock upgrades.
-        </Text>
-        <TouchableOpacity>
-          <Text style={styles.readMore}>Read More ▾</Text>
-        </TouchableOpacity>
+          {/* Title & developer */}
+          <Text style={styles.title}>{game.title}</Text>
+          <Text style={styles.developer}>
+            {game.developer ?? ''}
+            {game.releaseYear ? ` • ${game.releaseYear}` : ''}
+          </Text>
 
-        {/* Community Reviews */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Community Reviews</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Review', { game })}>
-            <Text style={styles.writeReview}>WRITE REVIEW</Text>
+          {/* Action buttons */}
+          <TouchableOpacity style={styles.primaryButton}>
+            <Ionicons name="library-outline" size={18} color={COLORS.background} />
+            <Text style={styles.primaryButtonText}>Add to Library</Text>
           </TouchableOpacity>
-        </View>
+          <TouchableOpacity style={styles.secondaryButton}>
+            <Ionicons name="play-circle-outline" size={18} color={COLORS.primary} />
+            <Text style={styles.secondaryButtonText}>Mark as Playing</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.outlineButton}>
+            <Ionicons name="bookmark-outline" size={18} color={COLORS.textPrimary} />
+            <Text style={styles.outlineButtonText}>Add to Wishlist</Text>
+          </TouchableOpacity>
 
-        {reviews.map((review) => (
-          <View key={review.id} style={styles.reviewCard}>
-            <View style={styles.reviewHeader}>
-              <View style={styles.reviewUser}>
-                <View style={styles.reviewAvatar}>
-                  <Text style={styles.reviewAvatarText}>{review.user.charAt(0)}</Text>
-                </View>
-                <View>
-                  <Text style={styles.reviewUserName}>{review.user}</Text>
-                  <Text style={styles.reviewDate}>{review.date}</Text>
-                </View>
-              </View>
-              <View style={styles.reviewStars}>
-                {[1, 2, 3, 4, 5].map((s) => (
-                  <Ionicons
-                    key={s}
-                    name={s <= review.rating ? 'star' : 'star-outline'}
-                    size={12}
-                    color={COLORS.star}
-                  />
-                ))}
-              </View>
-            </View>
-            <Text style={styles.reviewText}>{review.text}</Text>
+          {/* Rating */}
+          <View style={styles.ratingSection}>
+            <Text style={styles.ratingBig}>{game.rating.toFixed(1)}</Text>
+            <StarRow rating={game.rating} size={18} />
+            <Text style={styles.reviewCount}>
+              {game.reviewCount > 0 ? `${game.reviewCount.toLocaleString()} REVIEWS` : 'İLK YORUMU YAZ'}
+            </Text>
           </View>
-        ))}
 
-        {/* Similar Games */}
-        <Text style={styles.sectionTitle}>Similar Games</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.similarList}>
-          {similarGames.map((sg) => (
-            <TouchableOpacity key={sg.id} style={styles.similarCard}>
-              <Image source={{ uri: sg.image }} style={styles.similarImage} />
-              <Text style={styles.similarTitle}>{sg.title}</Text>
-              <Text style={styles.similarGenre}>{sg.genre}</Text>
+          {/* Description */}
+          <Text style={styles.sectionTitle}>Description</Text>
+          <Text style={styles.description}>
+            {descExpanded ? description : shortDesc}
+          </Text>
+          {description.length > 160 && (
+            <TouchableOpacity onPress={() => setDescExpanded(!descExpanded)}>
+              <Text style={styles.readMore}>
+                {descExpanded ? 'Show Less ▴' : 'Read More ▾'}
+              </Text>
             </TouchableOpacity>
-          ))}
-        </ScrollView>
+          )}
 
-        <View style={{ height: 30 }} />
-      </ScrollView>
+          {/* Community Reviews */}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Community Reviews</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Review', { gameId: game.id, gameTitle: game.title })}>
+              <Text style={styles.writeReview}>WRITE REVIEW</Text>
+            </TouchableOpacity>
+          </View>
+
+          {reviews.length > 0 ? reviews.map((review) => (
+            <View key={review.id} style={styles.reviewCard}>
+              <View style={styles.reviewHeader}>
+                <View style={styles.reviewUser}>
+                  <View style={styles.reviewAvatar}>
+                    <Text style={styles.reviewAvatarText}>
+                      {(review.user?.username ?? 'U').charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                  <View>
+                    <Text style={styles.reviewUserName}>{review.user?.username ?? 'Kullanıcı'}</Text>
+                    <Text style={styles.reviewDate}>
+                      {new Date(review.createdAt).toLocaleDateString('tr-TR')}
+                    </Text>
+                  </View>
+                </View>
+                <StarRow rating={review.rating} size={12} />
+              </View>
+              <Text style={styles.reviewText}>{review.comment}</Text>
+            </View>
+          )) : (
+            <View style={styles.emptyReviews}>
+              <Ionicons name="chatbubble-outline" size={32} color={COLORS.textSecondary} />
+              <Text style={styles.emptyReviewText}>Henüz yorum yok. İlk yorumu yaz!</Text>
+            </View>
+          )}
+
+          {/* Similar Games */}
+          {similar.length > 0 && (
+            <>
+              <Text style={[styles.sectionTitle, { marginTop: SPACING.lg }]}>Similar Games</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.similarList}>
+                {similar.map((sg) => (
+                  <TouchableOpacity
+                    key={sg.id}
+                    style={styles.similarCard}
+                    onPress={() => navigation.push('GameDetail', { gameId: sg.id })}
+                  >
+                    <Image
+                      source={{ uri: sg.coverImageUrl }}
+                      style={styles.similarImage}
+                    />
+                    <Text style={styles.similarTitle} numberOfLines={2}>{sg.title}</Text>
+                    <Text style={styles.similarGenre} numberOfLines={1}>
+                      {(sg.genres ?? []).join(', ')}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </>
+          )}
+
+          <View style={{ height: 40 }} />
+        </View>
+      </Animated.ScrollView>
     </View>
   );
 }
@@ -180,38 +262,92 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
+  centered: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 12,
+  },
+  emptyText: {
+    color: COLORS.textSecondary,
+    fontSize: FONTS.sizes.md,
+  },
+  backFallback: { marginTop: 8 },
+
+  // Sticky header
+  stickyHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    height: 56,
+    paddingTop: 10,
+    backgroundColor: COLORS.background,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  stickyBack: {
+    marginRight: SPACING.md,
+    padding: 4,
+  },
+  stickyTitle: {
+    flex: 1,
+    color: COLORS.textPrimary,
+    fontSize: FONTS.sizes.lg,
+    fontWeight: '700',
+  },
+
+  // Cover
   coverContainer: {
-    position: 'relative',
+    height: COVER_HEIGHT,
+    overflow: 'hidden',
+    backgroundColor: COLORS.surface,
   },
   coverImage: {
-    width: '100%',
-    height: 250,
+    width: SCREEN_WIDTH,
+    height: COVER_HEIGHT,
+  },
+  coverGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 120,
+    backgroundColor: 'transparent',
+    // Fade from transparent to background
+    // LinearGradient olmadan basit overlay
   },
   coverOverlay: {
     position: 'absolute',
-    top: 50,
+    top: 44,
     left: SPACING.lg,
     right: SPACING.lg,
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(0,0,0,0.55)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  coverActions: {
-    flexDirection: 'row',
-    gap: 12,
+
+  body: {
+    paddingTop: SPACING.lg,
   },
   tagsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     paddingHorizontal: SPACING.lg,
-    marginTop: SPACING.lg,
     gap: 8,
+    marginBottom: SPACING.sm,
   },
   tag: {
     borderWidth: 1,
@@ -226,18 +362,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   title: {
-    fontSize: FONTS.sizes.title,
+    fontSize: FONTS.sizes.title ?? 24,
     fontWeight: 'bold',
     color: COLORS.textPrimary,
     paddingHorizontal: SPACING.lg,
-    marginTop: SPACING.md,
+    marginTop: SPACING.sm,
   },
   developer: {
     color: COLORS.textSecondary,
     fontSize: FONTS.sizes.md,
     paddingHorizontal: SPACING.lg,
     marginBottom: SPACING.lg,
+    marginTop: 4,
   },
+
+  // Buttons
   primaryButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -258,7 +397,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: COLORS.primary,
     marginHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
@@ -288,6 +427,8 @@ const styles = StyleSheet.create({
     fontSize: FONTS.sizes.lg,
     fontWeight: '600',
   },
+
+  // Rating
   ratingSection: {
     alignItems: 'center',
     paddingVertical: SPACING.lg,
@@ -296,22 +437,22 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     marginHorizontal: SPACING.lg,
     marginBottom: SPACING.xl,
+    gap: 6,
   },
   ratingBig: {
-    fontSize: 42,
+    fontSize: 48,
     fontWeight: 'bold',
     color: COLORS.primary,
-  },
-  starsRow: {
-    flexDirection: 'row',
-    gap: 2,
-    marginVertical: 4,
+    lineHeight: 52,
   },
   reviewCount: {
     color: COLORS.textSecondary,
     fontSize: FONTS.sizes.xs,
     letterSpacing: 1,
+    marginTop: 2,
   },
+
+  // Description
   sectionTitle: {
     fontSize: FONTS.sizes.xl,
     fontWeight: 'bold',
@@ -337,8 +478,9 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontSize: FONTS.sizes.md,
     paddingHorizontal: SPACING.lg,
-    marginTop: 4,
+    marginTop: 6,
     marginBottom: SPACING.lg,
+    fontWeight: '600',
   },
   writeReview: {
     color: COLORS.primary,
@@ -346,6 +488,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.5,
   },
+
+  // Reviews
   reviewCard: {
     backgroundColor: COLORS.surface,
     marginHorizontal: SPACING.lg,
@@ -362,19 +506,20 @@ const styles = StyleSheet.create({
   reviewUser: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
   reviewAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: COLORS.card,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: COLORS.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
   reviewAvatarText: {
     color: COLORS.primary,
     fontWeight: '700',
+    fontSize: FONTS.sizes.md,
   },
   reviewUserName: {
     color: COLORS.textPrimary,
@@ -385,28 +530,39 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     fontSize: FONTS.sizes.xs,
   },
-  reviewStars: {
-    flexDirection: 'row',
-    gap: 1,
-  },
   reviewText: {
     color: COLORS.textSecondary,
     fontSize: FONTS.sizes.md,
     lineHeight: 20,
   },
+  emptyReviews: {
+    alignItems: 'center',
+    paddingVertical: SPACING.xl,
+    gap: 8,
+    marginHorizontal: SPACING.lg,
+    borderRadius: BORDER_RADIUS.md,
+    backgroundColor: COLORS.surface,
+  },
+  emptyReviewText: {
+    color: COLORS.textSecondary,
+    fontSize: FONTS.sizes.md,
+  },
+
+  // Similar
   similarList: {
     paddingHorizontal: SPACING.lg,
     marginTop: SPACING.sm,
   },
   similarCard: {
     marginRight: SPACING.md,
-    width: 100,
+    width: 110,
   },
   similarImage: {
-    width: 100,
-    height: 100,
+    width: 110,
+    height: 110,
     borderRadius: BORDER_RADIUS.md,
-    marginBottom: 4,
+    marginBottom: 6,
+    backgroundColor: COLORS.surface,
   },
   similarTitle: {
     color: COLORS.textPrimary,
@@ -416,5 +572,6 @@ const styles = StyleSheet.create({
   similarGenre: {
     color: COLORS.textSecondary,
     fontSize: FONTS.sizes.xs,
+    marginTop: 2,
   },
 });

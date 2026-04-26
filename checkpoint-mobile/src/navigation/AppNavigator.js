@@ -3,19 +3,17 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants/theme';
 
-// Stack Navigators
-import HomeStack from './StackNavigators';
+import { HomeStackNavigator, SearchStackNavigator } from './StackNavigators';
 import LibraryScreen from '../screens/LibraryScreen';
-import SearchScreen from '../screens/SearchScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
 
 const tabIcons = {
-  Home: { focused: 'home', unfocused: 'home-outline' },
+  Home:    { focused: 'home',    unfocused: 'home-outline' },
   Library: { focused: 'library', unfocused: 'library-outline' },
-  Search: { focused: 'search', unfocused: 'search-outline' },
-  Profile: { focused: 'person', unfocused: 'person-outline' },
+  Search:  { focused: 'search',  unfocused: 'search-outline' },
+  Profile: { focused: 'person',  unfocused: 'person-outline' },
 };
 
 export default function AppNavigator() {
@@ -44,10 +42,10 @@ export default function AppNavigator() {
         },
       })}
     >
-      <Tab.Screen name="Home" component={HomeStack} options={{ tabBarLabel: 'HOME' }} />
-      <Tab.Screen name="Library" component={LibraryScreen} options={{ tabBarLabel: 'LIBRARY' }} />
-      <Tab.Screen name="Search" component={SearchScreen} options={{ tabBarLabel: 'SEARCH' }} />
-      <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarLabel: 'PROFILE' }} />
+      <Tab.Screen name="Home"    component={HomeStackNavigator}   options={{ tabBarLabel: 'HOME' }} />
+      <Tab.Screen name="Library" component={LibraryScreen}        options={{ tabBarLabel: 'LIBRARY' }} />
+      <Tab.Screen name="Search"  component={SearchStackNavigator} options={{ tabBarLabel: 'SEARCH' }} />
+      <Tab.Screen name="Profile" component={ProfileScreen}        options={{ tabBarLabel: 'PROFILE' }} />
     </Tab.Navigator>
   );
 }

@@ -22,6 +22,10 @@
         "backgroundColor": "#0D1117"
       },
       "package": "com.checkpoint.app"
-    }
+    },
+    "plugins": [
+      "expo-asset",
+      "expo-font"
+    ]
   }
 }

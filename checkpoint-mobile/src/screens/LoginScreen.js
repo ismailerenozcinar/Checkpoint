@@ -7,8 +7,6 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  Image,
-  Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS } from '../constants/theme';
@@ -20,29 +18,26 @@ export default function LoginScreen({ navigation, route }) {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
 
-  // AuthContext tabanlı flow varsa, login'i context'ten alacağız.
-  // Şimdilik route.params veya global state'ten login fonksiyonuna erişim.
-  const { onLogin } = route.params;
+  const onLogin = route.params?.onLogin;
 
   const handleLogin = async () => {
+    setError('');
+
     if (!email || !password) {
-      Alert.alert('Hata', 'Lütfen tüm alanları doldurun.');
+      setError('Lütfen tüm alanları doldurun.');
       return;
     }
 
     setIsLoading(true);
     try {
       const response = await authService.login(email, password);
-      // Backend başarılı döndüyse
       await AsyncStorage.setItem('userToken', response.data.token);
       await AsyncStorage.setItem('userData', JSON.stringify(response.data.user));
-      
-      // Token state'ini güncelle (App.js veya AuthProvider'daki metod)
-      onLogin(response.data.token);
-    } catch (error) {
-      const message = error.response?.data?.message || 'Giriş yapılamadı.';
-      Alert.alert('Giriş Başarısız', message);
+      onLogin?.(response.data.token);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Giriş yapılamadı. Bilgileri kontrol et.');
     } finally {
       setIsLoading(false);
     }
@@ -61,6 +56,13 @@ export default function LoginScreen({ navigation, route }) {
         </View>
 
         <View style={styles.form}>
+          {error ? (
+            <View style={styles.errorBox}>
+              <Ionicons name="warning-outline" size={16} color={COLORS.error} />
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : null}
+
           <View style={styles.inputContainer}>
             <Ionicons name="mail-outline" size={20} color={COLORS.textSecondary} style={styles.inputIcon} />
             <TextInput
@@ -85,7 +87,11 @@ export default function LoginScreen({ navigation, route }) {
               onChangeText={setPassword}
             />
             <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
-              <Ionicons name={showPassword ? "eye-outline" : "eye-off-outline"} size={20} color={COLORS.textSecondary} />
+              <Ionicons
+                name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+                size={20}
+                color={COLORS.textSecondary}
+              />
             </TouchableOpacity>
           </View>
 
@@ -93,8 +99,8 @@ export default function LoginScreen({ navigation, route }) {
             <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={[styles.loginButton, isLoading && styles.loginButtonDisabled]} 
+          <TouchableOpacity
+            style={[styles.loginButton, isLoading && styles.buttonDisabled]}
             onPress={handleLogin}
             disabled={isLoading}
           >
@@ -106,7 +112,9 @@ export default function LoginScreen({ navigation, route }) {
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>Don't have an account? </Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Register')}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Register', { onLogin })}
+          >
             <Text style={styles.registerText}>Sign Up</Text>
           </TouchableOpacity>
         </View>
@@ -142,6 +150,20 @@ const styles = StyleSheet.create({
   },
   form: {
     width: '100%',
+  },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(207,34,46,0.12)',
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
+    gap: 8,
+  },
+  errorText: {
+    color: COLORS.error,
+    fontSize: FONTS.sizes.sm,
+    flex: 1,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -179,7 +201,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: 'center',
   },
-  loginButtonDisabled: {
+  buttonDisabled: {
     opacity: 0.7,
   },
   loginButtonText: {

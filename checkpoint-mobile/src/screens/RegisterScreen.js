@@ -7,8 +7,7 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  Alert,
-  ScrollView
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS } from '../constants/theme';
@@ -22,33 +21,36 @@ export default function RegisterScreen({ navigation, route }) {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
 
-  // onLogin context/route metod
-  const { onLogin } = route.params;
+  const onLogin = route.params?.onLogin;
 
   const handleRegister = async () => {
+    setError('');
+
     if (!username || !email || !password || !passwordConfirm) {
-      Alert.alert('Hata', 'Lütfen tüm alanları doldurun.');
+      setError('Lütfen tüm alanları doldurun.');
       return;
     }
 
     if (password !== passwordConfirm) {
-      Alert.alert('Hata', 'Şifreler uyuşmuyor.');
+      setError('Şifreler uyuşmuyor.');
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('Şifre en az 6 karakter olmalı.');
       return;
     }
 
     setIsLoading(true);
     try {
       const response = await authService.register({ username, email, password });
-      
-      // Kayıt başarılıysa otomatik giriş yap ve tokeni kaydet
       await AsyncStorage.setItem('userToken', response.data.token);
       await AsyncStorage.setItem('userData', JSON.stringify(response.data.user));
-      
-      onLogin(response.data.token);
-    } catch (error) {
-      const message = error.response?.data?.message || 'Kayıt işlemi başarısız.';
-      Alert.alert('Hata', message);
+      onLogin?.(response.data.token);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Kayıt işlemi başarısız. Tekrar dene.');
     } finally {
       setIsLoading(false);
     }
@@ -70,6 +72,13 @@ export default function RegisterScreen({ navigation, route }) {
         </View>
 
         <View style={styles.form}>
+          {error ? (
+            <View style={styles.errorBox}>
+              <Ionicons name="warning-outline" size={16} color={COLORS.error} />
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : null}
+
           <View style={styles.inputContainer}>
             <Ionicons name="person-outline" size={20} color={COLORS.textSecondary} style={styles.inputIcon} />
             <TextInput
@@ -106,7 +115,11 @@ export default function RegisterScreen({ navigation, route }) {
               onChangeText={setPassword}
             />
             <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
-              <Ionicons name={showPassword ? "eye-outline" : "eye-off-outline"} size={20} color={COLORS.textSecondary} />
+              <Ionicons
+                name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+                size={20}
+                color={COLORS.textSecondary}
+              />
             </TouchableOpacity>
           </View>
 
@@ -122,14 +135,21 @@ export default function RegisterScreen({ navigation, route }) {
             />
           </View>
 
-          <TouchableOpacity 
-            style={[styles.registerButton, isLoading && styles.registerButtonDisabled]} 
+          <TouchableOpacity
+            style={[styles.registerButton, isLoading && styles.buttonDisabled]}
             onPress={handleRegister}
             disabled={isLoading}
           >
             <Text style={styles.registerButtonText}>
               {isLoading ? 'CREATING ACCOUNT...' : 'SIGN UP'}
             </Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>Already have an account? </Text>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Text style={styles.loginText}>Login</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -170,6 +190,20 @@ const styles = StyleSheet.create({
   form: {
     width: '100%',
   },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(207,34,46,0.12)',
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
+    gap: 8,
+  },
+  errorText: {
+    color: COLORS.error,
+    fontSize: FONTS.sizes.sm,
+    flex: 1,
+  },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -199,7 +233,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: SPACING.md,
   },
-  registerButtonDisabled: {
+  buttonDisabled: {
     opacity: 0.7,
   },
   registerButtonText: {
@@ -207,5 +241,19 @@ const styles = StyleSheet.create({
     fontSize: FONTS.sizes.lg,
     fontWeight: 'bold',
     letterSpacing: 1,
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 32,
+  },
+  footerText: {
+    color: COLORS.textSecondary,
+    fontSize: FONTS.sizes.md,
+  },
+  loginText: {
+    color: COLORS.primary,
+    fontSize: FONTS.sizes.md,
+    fontWeight: 'bold',
   },
 });
